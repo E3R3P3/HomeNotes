@@ -13,7 +13,7 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #4F573D 0%, #453D57 100%);
             min-height: 100vh;
             padding: 10px;
             display: flex;
@@ -35,7 +35,7 @@
         }
 
         .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #453D57 0%, #4F573D 100%);
             color: white;
             padding: 20px;
             text-align: center;
@@ -89,7 +89,7 @@
 
         button {
             padding: 12px 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #667eea;
             color: white;
             border: none;
             border-radius: 8px;
@@ -298,7 +298,7 @@
             width: 56px;
             height: 56px;
             border-radius: 50%;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: #667eea;
             color: white;
             border: none;
             font-size: 28px;
@@ -342,7 +342,7 @@
         </div>
 
         <div class="form-section">
-            <p style="color:#666;font-size:14px;">Pulsa el botón <strong>＋</strong> (esquina inferior derecha) para crear una nueva tarea.</p>
+            <!-- <p style="color:#666;font-size:14px;">Pulsa el botón <strong>＋</strong> (esquina inferior derecha) para crear una nueva tarea.</p> -->
         </div>
 
         <div class="tasks-section">
@@ -377,14 +377,26 @@
             <h3 id="modalTitle">Nueva tarea</h3>
             <input type="text" id="modalTitulo" placeholder="Título" />
             <textarea id="modalDescripcion" placeholder="Descripción (opcional)"></textarea>
-            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;">
+
+            <div style="margin-top:18px;">
+                <strong>Subtareas</strong>
+                <div id="subtareasList" style="margin-top:8px;display:flex;flex-direction:column;gap:8px;">
+                    <!-- subtareas se renderizan aquí -->
+                </div>
+                <div style="display:flex;gap:8px;margin-top:8px;">
+                    <input id="subtareaInput" type="text" placeholder="Añadir subtarea" style="flex:1;padding:8px;border-radius:6px;border:1px solid #ddd;" />
+                    <button onclick="addSubtarea()" style="padding:8px 12px;border-radius:6px;">Añadir</button>
+                </div>
+            </div>
+
+            <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
                 <button onclick="closeModal()" style="background:#ddd;color:#333;padding:8px 12px;border-radius:6px;">Cancelar</button>
                 <button onclick="saveModal()">Guardar</button>
             </div>
         </div>
     </div>
 
-        <!-- Delete confirmation modal -->
+        <!-- Delete confirmation modal for tasks -->
         <div id="deleteModal" class="modal" style="display:none;">
             <div class="modal-backdrop" onclick="closeDeleteModal()"></div>
             <div class="modal-content">
@@ -393,6 +405,32 @@
                 <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;">
                     <button onclick="closeDeleteModal()" style="background:#ddd;color:#333;padding:8px 12px;border-radius:6px;">Cancelar</button>
                     <button id="confirmDeleteBtn" onclick="confirmDelete()" style="background:#ff6b6b;color:white;padding:8px 12px;border-radius:6px;">Eliminar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Delete confirmation modal for subtasks -->
+        <div id="deleteSubModal" class="modal" style="display:none;">
+            <div class="modal-backdrop" onclick="closeDeleteSubModal()"></div>
+            <div class="modal-content">
+                <h3>Eliminar subtarea</h3>
+                <p>¿Estás seguro que deseas eliminar esta subtarea?</p>
+                <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;">
+                    <button onclick="closeDeleteSubModal()" style="background:#ddd;color:#333;padding:8px 12px;border-radius:6px;">Cancelar</button>
+                    <button onclick="confirmDeleteSub()" style="background:#ff6b6b;color:white;padding:8px 12px;border-radius:6px;">Eliminar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit subtask modal -->
+        <div id="editSubModal" class="modal" style="display:none;">
+            <div class="modal-backdrop" onclick="closeEditSubModal()"></div>
+            <div class="modal-content">
+                <h3>Editar subtarea</h3>
+                <input type="text" id="editSubInput" placeholder="Título" style="width:100%;margin-top:8px;padding:10px;border-radius:8px;border:1px solid #ddd;" />
+                <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px;">
+                    <button onclick="closeEditSubModal()" style="background:#ddd;color:#333;padding:8px 12px;border-radius:6px;">Cancelar</button>
+                    <button onclick="confirmEditSub()" style="padding:8px 12px;border-radius:6px;">Guardar</button>
                 </div>
             </div>
         </div>
@@ -418,6 +456,112 @@
             }
         }
 
+        // Subtareas: cargar y renderizar dentro del modal
+        async function cargarSubtareas(tareaId) {
+            try {
+                const res = await fetch(`/api/tareas/${tareaId}/subtareas`);
+                if (!res.ok) return;
+                const list = await res.json();
+                renderizarSubtareas(list);
+            } catch (err) { console.error(err); }
+        }
+
+        function renderizarSubtareas(subs) {
+            const cont = document.getElementById('subtareasList');
+            cont.innerHTML = subs.map(s => `
+                <div class="sub-item" style="display:flex;align-items:center;gap:8px;">
+                    <input type="checkbox" ${s.completada ? 'checked' : ''} onchange="toggleSubtarea(${s.id}, this.checked)" />
+                    <div style="flex:1;word-break:break-word;${s.completada ? 'text-decoration:line-through;color:#999;' : ''}">${escapeHtml(s.titulo)}</div>
+                    <button onclick="(event.stopPropagation(), editSubtareaPrompt(${s.id}, ${s.tarea_id}))" style="background:#f0f0f0;border:none;border-radius:6px;padding:6px;">✏️</button>
+                    <button onclick="(event.stopPropagation(), deleteSubtarea(${s.id}))" style="background:#ff6b6b;color:white;border:none;border-radius:6px;padding:6px;">🗑️</button>
+                </div>
+            `).join('');
+        }
+
+        async function addSubtarea() {
+            const titulo = document.getElementById('subtareaInput').value.trim();
+            if (!titulo) { showToast('Ingrese texto para la subtarea'); return; }
+            if (!currentEditId) { showToast('Guarde la tarea primero'); return; }
+            try {
+                const res = await fetch(`/api/tareas/${currentEditId}/subtareas`, {
+                    method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ titulo })
+                });
+                if (res.ok) {
+                    document.getElementById('subtareaInput').value = '';
+                    cargarSubtareas(currentEditId);
+                    showToast('Subtarea creada');
+                } else showToast('Error creando subtarea');
+            } catch (err) { console.error(err); showToast('Error creando subtarea'); }
+        }
+
+        async function toggleSubtarea(id, completada) {
+            try {
+                const res = await fetch(`/api/subtareas/${id}/completar`, {
+                    method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ completada })
+                });
+                if (res.ok) { cargarSubtareas(currentEditId); showToast(completada ? 'Subtarea completada' : 'Subtarea pendiente'); }
+            } catch (err) { console.error(err); showToast('Error'); }
+        }
+
+        // Delete/Edit subtask modals
+        let pendingDeleteSubId = null;
+        let pendingEditSubId = null;
+        let pendingEditSubTareaId = null;
+
+        function openDeleteSubModal(id) {
+            pendingDeleteSubId = id;
+            document.getElementById('deleteSubModal').style.display = 'flex';
+        }
+
+        function closeDeleteSubModal() {
+            pendingDeleteSubId = null;
+            document.getElementById('deleteSubModal').style.display = 'none';
+        }
+
+        async function confirmDeleteSub() {
+            if (!pendingDeleteSubId) return;
+            try {
+                const res = await fetch(`/api/subtareas/${pendingDeleteSubId}`, { method: 'DELETE' });
+                if (res.ok) { cargarSubtareas(currentEditId); showToast('Subtarea eliminada'); closeDeleteSubModal(); }
+            } catch (err) { console.error(err); showToast('Error'); }
+        }
+
+        function openEditSubModal(id, tareaId) {
+            pendingEditSubId = id;
+            pendingEditSubTareaId = tareaId;
+            fetch(`/api/tareas/${tareaId}/subtareas`).then(r => r.json()).then(list => {
+                const s = list.find(x => x.id === id);
+                if (s) document.getElementById('editSubInput').value = s.titulo;
+            }).catch(() => {});
+            document.getElementById('editSubModal').style.display = 'flex';
+            document.getElementById('editSubInput').focus();
+        }
+
+        function closeEditSubModal() {
+            pendingEditSubId = null;
+            pendingEditSubTareaId = null;
+            document.getElementById('editSubInput').value = '';
+            document.getElementById('editSubModal').style.display = 'none';
+        }
+
+        async function confirmEditSub() {
+            if (!pendingEditSubId) return;
+            const titulo = document.getElementById('editSubInput').value.trim();
+            if (!titulo) { showToast('El título es requerido'); return; }
+            try {
+                const res = await fetch(`/api/subtareas/${pendingEditSubId}`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ titulo }) });
+                if (res.ok) { cargarSubtareas(pendingEditSubTareaId); showToast('Subtarea actualizada'); closeEditSubModal(); }
+            } catch (err) { console.error(err); showToast('Error'); }
+        }
+
+        async function deleteSubtarea(id) {
+            openDeleteSubModal(id);
+        }
+
+        function editSubtareaPrompt(id, tareaId) {
+            openEditSubModal(id, tareaId);
+        }
+
         function renderizarTareas(tareas) {
             const lista = document.getElementById('tareasList');
             
@@ -432,19 +576,18 @@
             }
 
             lista.innerHTML = tareas.map(tarea => `
-                <div class="task-item ${tarea.completada ? 'completed' : ''}">
+                <div class="task-item ${tarea.completada ? 'completed' : ''}" onclick="openModal('edit', ${tarea.id})">
                     <div class="checkbox-wrapper">
                         <input type="checkbox" ${tarea.completada ? 'checked' : ''} 
-                               onchange="alternarTarea(${tarea.id}, this.checked)" />
+                               onchange="(event.stopPropagation(), alternarTarea(${tarea.id}, this.checked))" />
                     </div>
                     <div class="task-content">
                         <div class="task-title">${escapeHtml(tarea.titulo)}</div>
                         ${tarea.descripcion ? `<div class="task-description">${escapeHtml(tarea.descripcion)}</div>` : ''}
                     </div>
-                            <div class="task-actions">
-                                <button class="btn-edit" onclick="openModal('edit', ${tarea.id})">✏️</button>
-                                <button class="btn-delete" onclick="openDeleteModal(${tarea.id})">🗑️</button>
-                            </div>
+                                <div class="task-actions">
+                                    <button class="btn-delete" onclick="(event.stopPropagation(), openDeleteModal(${tarea.id}))">🗑️</button>
+                                </div>
                 </div>
             `).join('');
         }
@@ -565,6 +708,8 @@
                 title.textContent = 'Nueva tarea';
                 tituloInput.value = '';
                 descInput.value = '';
+                renderizarSubtareas([]);
+                document.getElementById('subtareaInput').value = '';
             } else if (mode === 'edit') {
                 currentEditId = id;
                 title.textContent = 'Editar tarea';
@@ -576,6 +721,8 @@
                         descInput.value = t.descripcion || '';
                     }
                 }).catch(err => console.error(err));
+                // cargar subtareas de esta tarea
+                cargarSubtareas(id);
             }
 
             modal.style.display = 'flex';
